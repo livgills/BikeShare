@@ -3,9 +3,10 @@ library(vroom)
 library(patchwork)
 library(DataExplorer)
 library(GGally)
+library(tidymodels)
 
 #Read in Code
-data <- vroom("Stat348/BikeShare/train.csv")
+data_train <- vroom("Stat348/BikeShare/train.csv")
 data_test <- vroom("Stat348/BikeShare/test.csv")
 
 #Exploratory Data Analysis 
@@ -38,3 +39,26 @@ graph4 <- ggplot(data = data, aes(x = temp, y = count)) +
 graph4
 
 (graph1 + graph2)/(graph3 + graph4)
+
+#Linear Regression
+# Setup and Fit the Linear Regression Model3
+my_linear_model <- linear_reg() %>% #Type of model
+  set_engine("lm") %>% # Engine = What R function to use
+  set_mode("regression") %>% # Regression just means quantitative response6
+  fit(formula=count~atemp + weather + humidity + windspeed + temp, data=data_train)
+
+## Generate Predictions Using Linear Model
+bike_predictions <- predict(my_linear_model,
+                            new_data=data_test) # Use fit to predict
+bike_predictions ## Look at the output
+
+#Submission to Kaggle
+kaggle_submission <- bike_predictions %>%
+bind_cols(., data_test) %>% #Bind predictions with test data
+  select(datetime, .pred) %>% #Just keep datetime and prediction variables
+  rename(count=.pred) %>% #rename pred to count (for submission to Kaggle)
+  mutate(count=pmax(0, count)) %>% #pointwise max of (0, prediction)
+  mutate(datetime=as.character(format(datetime))) #needed for right format to Kaggle
+## Write out the file
+vroom_write(x=kaggle_submission, file="./LinearPreds.csv", delim=",")
+
